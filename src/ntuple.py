@@ -20,16 +20,20 @@ LHCB = gbl.LHCb
 TrkCats = [('ve', 1), ('tt', 2), ('it', 3), ('ot', 4), ('mu', 7)]
 l0Trgs = [
     'L0DiMuonDecision',
-    'L0MuonDecision'
+    'L0MuonDecision',
+    'L0HadronDecision'  # TIS line
 ]
 hlt1Trgs = [
     'Hlt1DiMuonNoIPDecision',
-    'Hlt1DiMuonLowMassDecision'
+    'Hlt1DiMuonLowMassDecision',
+    'Hlt1MultiDiMuonNoIPDecision',
+    'Hlt1DiMuonLowMassDecision',
+    'Hlt1DiMuonHighMassDecision',  # probably not useful for eta decays
+    'Hlt1.*TrackMVA.*'  # TIS line
 ]
 hlt2Trgs = [
     'Hlt2ExoticaPrmptDiMuonTurbo',
     'Hlt2ExoticaDiMuonNoIPTurbo',
-    'Hlt2ExoticaDisplDiMuon'
 ]
 
 # =============================================================================
@@ -39,10 +43,10 @@ class Ntuple:
     Class to store an ntuple.
     """
 
-    def __init__(self, name, IS_MC, DECAY, tes, genTool, rftTool, pvrTool, velTool,
+    def __init__(self, name, is_mc, decay, tes, genTool, rftTool, pvrTool, velTool,
                  dstTool, detTool, trkTool, l0Tool, hlt1Tool, hlt2Tool):
-        self.IS_MC = IS_MC
-        self.decay = DECAY
+        self.IS_MC = is_mc
+        self.decay = decay
         self.tes = tes
         self.genTool = genTool
         self.rftTool = rftTool
@@ -64,7 +68,10 @@ class Ntuple:
                   'pnn_k', 'pnn_p', 'pnn_ghost', 'prb_ghost', 'ip', 'ip_chi2',
                   'x0', 'y0', 'z0', 't0', 'p0', 'id0', 'z1', 'id1', 'id2',
                   'id3', 'xm2', 'ym2', 'zm2']
-        # TODO not used: prt_iso, tag_ve_ns, tag_tt_ns, tag_it_ns, tag_ot_ns, tag_mu_ns
+        # NOTE not used: prt_iso, tag_ve_ns, tag_tt_ns, tag_it_ns, tag_ot_ns,
+        # tag_mu_ns
+        # self.vrsInit('prt_iso')
+        # self.vrsInit('tag', ['ve_ns', 'tt_ns', 'it_ns', 'ot_ns', 'mu_ns'])
         vrsTag = ['m', 'dtf_m', 'dtf_dm', 'ip', 'ip_chi2', 'fd', 'fd_chi2',
                   'doca', 'dtf_chi2', 'chi2']
         vrsTrg = (
@@ -74,12 +81,11 @@ class Ntuple:
             ['hlt1_tis%i' % i for i in range(len(hlt1Trgs))] +
             ['hlt2_tos%i' % i for i in range(len(hlt2Trgs))] +
             ['hlt2_tis%i' % i for i in range(len(hlt2Trgs))] +
-            ['hlt2_tos_displ', 'hlt2_tis_displ',
-             'hlt2_tos_topo',  'hlt2_tis_topo']
+            ['hlt2_tos_topo',  'hlt2_tis_topo']
         )
         self.vrsInit('pvr', vrsVrt)
         self.vrsInit('tag', ['idx_pvr'] + vrsMom + vrsVrt + vrsTag + vrsTrg)
-        # TODO not used: tag_ve_iso0, tag_ve_iso1, tag_ln_iso0, tag_ln_iso1,
+        # NOTE not used: tag_ve_iso0, tag_ve_iso1, tag_ln_iso0, tag_ln_iso1,
         # self.vrsInit('tag', ['ve_iso0', 've_iso1', 'ln_iso0', 'ln_iso1'])
         self.vrsInit('prt', ['idx_pvr', 'deltar', 'idx_mom'] + vrsMom + vrsPrt)
 
