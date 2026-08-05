@@ -27,8 +27,6 @@ hlt1Trgs = [
     'Hlt1DiMuonNoIPDecision',
     'Hlt1DiMuonLowMassDecision',
     'Hlt1MultiDiMuonNoIPDecision',
-    'Hlt1DiMuonLowMassDecision',
-    'Hlt1DiMuonHighMassDecision',  # probably not useful for eta decays
     'Hlt1.*TrackMVA.*'  # TIS line
 ]
 hlt2Trgs = [
