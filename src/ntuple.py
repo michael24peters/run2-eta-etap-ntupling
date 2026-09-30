@@ -85,7 +85,10 @@ class Ntuple:
         self.vrsInit('tag', ['idx_pvr'] + vrsMom + vrsVrt + vrsTag + vrsTrg)
         # NOTE not used: tag_ve_iso0, tag_ve_iso1, tag_ln_iso0, tag_ln_iso1,
         # self.vrsInit('tag', ['ve_iso0', 've_iso1', 'ln_iso0', 'ln_iso1'])
-        self.vrsInit('prt', ['idx_pvr', 'deltar', 'idx_mom'] + vrsMom + vrsPrt)
+        # Daughter momentum from the mother's DecayTreeFitter fit.
+        vrsPrtDtf = ['dtf_px', 'dtf_py', 'dtf_pz', 'dtf_e']
+        self.vrsInit('prt', ['idx_pvr', 'deltar', 'idx_mom'] + vrsMom + vrsPrt
+                     + vrsPrtDtf)
 
         # MC data.
         if self.IS_MC:
@@ -296,10 +299,12 @@ class Ntuple:
         # Daughters.
         if pre == 'tag':  # tag => candidate => has daughters
             trks = []
+            dtrIdxs = []  # (daughter, prefix, index) for the DTF fill below
             hits = [0] * 13  # Default (to prevent segfault)
             for dtr in prt.daughters():
                 # Recursively loop thru daughters
                 (dtrPre, dtrIdx) = self.fillPrt(dtr)
+                dtrIdxs.append((dtr, dtrPre, dtrIdx))
 
                 # Mother (tag) indexing for daughters (prt)
                 try: self.fill('%s_idx_mom' % dtrPre, idx
@@ -333,6 +338,16 @@ class Ntuple:
                 # Save fitted values, including uncertainty
                 self.fill('%s_dtf_chi2' % pre, dtf.chiSquare())
                 self.fillVrt(pre, prt, par.posCovMatrix(), par.position())
+                # Overwrite the placeholders of each daughter with its fitted
+                # momentum.
+                for dtr, dtrPre, dtrIdx in dtrIdxs:
+                    try:
+                        dtrMom = dtf.fitParams(dtr).momentum()
+                        self.fill('%s_dtf_px' % dtrPre, dtrMom.Px(), dtrIdx)
+                        self.fill('%s_dtf_py' % dtrPre, dtrMom.Py(), dtrIdx)
+                        self.fill('%s_dtf_pz' % dtrPre, dtrMom.Pz(), dtrIdx)
+                        self.fill('%s_dtf_e' % dtrPre, dtrMom.E(), dtrIdx)
+                    except: pass  # Placeholders (-1) stay
             # Use original vertex info from Particle if no dtf.
             else:
                 self.fill('%s_dtf_chi2' % pre, -1)
@@ -343,6 +358,10 @@ class Ntuple:
         # Momentum and mass.
         self.fill('%s_m' % pre, prt.measuredMass())
         self.fillMom(pre, mom)
+        # DTF momentum placeholders, overwritten by the mother's fit.
+        if pre == 'prt':
+            for v in ['px', 'py', 'pz', 'e']:
+                self.fill('prt_dtf_%s' % v, -1)
 
         # Trigger.
         if pre == 'tag':
@@ -598,7 +617,6 @@ class Ntuple:
         """
         pid = prt.particleID().pid()
         mom = prt.momentum()
-        pos = None
         key = self.key(prt)
         pre = 'mc'
         if key in self.saved: return (pre, self.saved[key])
