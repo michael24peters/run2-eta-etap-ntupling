@@ -107,8 +107,8 @@ if DECAY not in DECAYS:
 DaVinci().DataType = '2018'
 DaVinci().Lumi = False  # Processing luminosity data
 # Local sample
-args = parseArgsLocal()
 if IS_SAMPLE:
+    args = parseArgsLocal()
     # MC
     if IS_MC:
         DaVinci().Lumi = False  # No luminosity data for MC.
