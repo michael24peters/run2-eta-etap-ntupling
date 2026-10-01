@@ -22,6 +22,12 @@ test/
 plot/
 plots/
 
+# ntuple/ directory
+ntuple/
+
+# log files
+*.log
+
 # png files
 *.png
 

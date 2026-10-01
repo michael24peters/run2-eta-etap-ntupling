@@ -189,12 +189,14 @@ class Ntuple:
         vrs : not in use
         """
 
-        if key is None or val is None: 
+        if key is None:
             # Do not fill empty events
             if self.is_event_empty(): return
             self.tfile.Cd('')
             self.ttree.Fill()
         elif key in self.ntuple:
+            # A value of None is stored as -1.
+            if val is None: val = -1
             if idx is None: self.ntuple[key].push_back(val)
             elif idx < len(self.ntuple[key]): self.ntuple[key][idx] = val
 
@@ -241,33 +243,64 @@ class Ntuple:
 
     # ---------------------------------------------------------------------------
 
+    def trackIDs(self, prt):
+        """
+        LHCb IDs of every track in the decay tree of prt, one set per track.
+        Particles without a track (photons) contribute nothing.
+        """
+        # Final-state particle: its own track's IDs, or nothing if it has no
+        # track (neutral)
+        if prt.isBasicParticle():
+            trk = prt.proto().track() if prt.proto() else None
+            return [set(id.lhcbID() for id in trk.lhcbIDs())] if trk else []
+        # Composite particle (e.g. J/psi): collect the tracks of its daughters
+        ids = []
+        for dtr in prt.daughtersVector(): ids += self.trackIDs(dtr)
+        return ids
+
+    # ---------------------------------------------------------------------------
+
     def turboTISTOS(self, obj, line, mode='tos'):
         """
-        Compute TOS/TIS for Turbo HLT2 lines by comparing offline daughter track
-        LHCb IDs against online candidate daughters in the Turbo container.
-        For non-Turbo lines whose container is absent, falls back to the DecReport
-        decision (TOS=False, TIS=True when fired).
+        TOS/TIS of the offline candidate obj for a Turbo HLT2 line, from the
+        overlap of LHCb IDs between the line's online candidates (Turbo
+        container) and the tracks in obj's decay tree (LHCb-PUB-2014-039):
+        - TOS: some online candidate has more than 70% of the LHCb IDs of every
+          one of its tracks on tracks of obj.
+        - TIS: some online candidate has less than 1% of the LHCb IDs of every
+          one of its tracks on tracks of obj.
+        A candidate can be both TOS and TIS. Returns False if the line did not
+        fire, and -1 if the decision or the Turbo container cannot be read.
         """
-        if not obj: return False
-        if   mode == 'tos': threshold = 0.7;  flag = False
-        elif mode == 'tis': threshold = 0.01; flag = True
-        else: return False
+        if not obj or mode not in ('tos', 'tis'): return False
+        # Did the line fire in this event? If so, get the candidates it fired on
+        # (the online candidates persisted in the Turbo container).
         try:
             reports = self.tes[os.path.join(DaVinci().RootInTES, 'Hlt2/DecReports')]
-            if not reports.decReport(line + 'Decision').decision(): return False
+            report = reports.decReport(line + 'Decision')
+            if not report or not report.decision(): return False
             online_cands = self.tes[os.path.join(DaVinci().RootInTES, line, 'Particles')]
-            trackPassed = [False] * len(obj.daughtersVector())
-            for i, track in enumerate(obj.daughtersVector()):
-                offlineIDs = set(id.lhcbID() for id in track.proto().track().lhcbIDs())
-                for cand in (online_cands or []):
-                    for dtr in cand.daughtersVector():
-                        if dtr.particleID().pid() != track.particleID().pid(): continue
-                        try: onlineIDs = set(id.lhcbID() for id in dtr.proto().track().lhcbIDs())
-                        except: continue
-                        if offlineIDs and len(offlineIDs & onlineIDs) / len(offlineIDs) > threshold:
-                            trackPassed[i] = True
-            return False if trackPassed.count(flag) else True
-        except: pass
+        except: return -1
+        if online_cands is None: return -1
+
+        # All LHCb IDs (detector hits) on the tracks of the offline candidate
+        offlineIDs = set()
+        for ids in self.trackIDs(obj):
+            for i in ids: offlineIDs.add(i)
+
+        # Check each online candidate the line fired on
+        for cand in online_cands:
+            # For each of its tracks, the fraction of the track's hits that are
+            # also hits of the offline candidate
+            fractions = []
+            for ids in self.trackIDs(cand):
+                if ids: fractions.append(float(len(ids & offlineIDs)) / len(ids))
+            if not fractions: continue
+            # TOS: every track of this online candidate is a signal track
+            if mode == 'tos' and min(fractions) > 0.7: return True
+            # TIS: no track of this online candidate shares hits with the signal
+            if mode == 'tis' and max(fractions) < 0.01: return True
+        return False
 
     # ---------------------------------------------------------------------------
 
