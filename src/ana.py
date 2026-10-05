@@ -158,7 +158,7 @@ else:
     
 # Reconstruction.
 from Configurables import CombineParticles
-from StandardParticles import StdAllLooseMuons as muons
+from StandardParticles import StdLooseMuons as muons
 from StandardParticles import StdLooseAllPhotons as photons
 from StandardParticles import StdLooseElectrons as electrons
 from PhysSelPython.Wrappers import Selection, SelectionSequence
