@@ -32,6 +32,7 @@ hlt1Trgs = [
 hlt2Trgs = [
     'Hlt2ExoticaPrmptDiMuonTurbo',
     'Hlt2ExoticaDiMuonNoIPTurbo',
+    'Hlt2.*Topo.*'  # TIS line
 ]
 
 # =============================================================================
@@ -78,8 +79,7 @@ class Ntuple:
             ['hlt1_tos%i' % i for i in range(len(hlt1Trgs))] +
             ['hlt1_tis%i' % i for i in range(len(hlt1Trgs))] +
             ['hlt2_tos%i' % i for i in range(len(hlt2Trgs))] +
-            ['hlt2_tis%i' % i for i in range(len(hlt2Trgs))] +
-            ['hlt2_tos_topo',  'hlt2_tis_topo']
+            ['hlt2_tis%i' % i for i in range(len(hlt2Trgs))]
         )
         self.vrsInit('pvr', vrsVrt)
         self.vrsInit('tag', ['idx_pvr'] + vrsMom + vrsVrt + vrsTag + vrsTrg)
@@ -255,7 +255,9 @@ class Ntuple:
             return [set(id.lhcbID() for id in trk.lhcbIDs())] if trk else []
         # Composite particle (e.g. J/psi): collect the tracks of its daughters
         ids = []
-        for dtr in prt.daughtersVector(): ids += self.trackIDs(dtr)
+        dtrs = prt.daughtersVector()
+        for k in range(dtrs.size()):
+            ids += self.trackIDs(dtrs[k])
         return ids
 
     # ---------------------------------------------------------------------------
@@ -334,7 +336,9 @@ class Ntuple:
             trks = []
             dtrIdxs = []  # (daughter, prefix, index) for the DTF fill below
             hits = [0] * 13  # Default (to prevent segfault)
-            for dtr in prt.daughters():
+            dtrs = prt.daughters()
+            for k in range(dtrs.size()):
+                dtr = dtrs[k]
                 # Recursively loop thru daughters
                 (dtrPre, dtrIdx) = self.fillPrt(dtr)
                 dtrIdxs.append((dtr, dtrPre, dtrIdx))
@@ -421,9 +425,9 @@ class Ntuple:
                 self.hlt1Tool.setTriggerInput(name)
                 self.fill('%s_hlt1_tos%i' % (pre, i), self.hlt1Tool.tisTosTobTrigger().tos())
                 self.fill('%s_hlt1_tis%i' % (pre, i), self.hlt1Tool.tisTosTobTrigger().tis())
-            # Fill HLT2 TIS and TOS info.
+            # Fill HLT2 TIS and TOS info (turboTISTOS for Turbo lines in data).
             for i, name in enumerate(hlt2Trgs):
-                if self.IS_MC:
+                if self.IS_MC or not name.endswith('Turbo'):
                     self.hlt2Tool.setTriggerInput(name + 'Decision')
                     self.fill('%s_hlt2_tos%i' % (pre, i), self.hlt2Tool.tisTosTobTrigger().tos())
                     self.fill('%s_hlt2_tis%i' % (pre, i), self.hlt2Tool.tisTosTobTrigger().tis())
@@ -435,9 +439,6 @@ class Ntuple:
             self.hlt2Tool.setTriggerInput('Hlt2ExoticaDisplDiMuon' + 'Decision')
             self.fill('%s_hlt2_tos_displ' % pre, self.hlt2Tool.tisTosTobTrigger().tos())
             self.fill('%s_hlt2_tis_displ' % pre, self.hlt2Tool.tisTosTobTrigger().tis())
-            self.hlt2Tool.setTriggerInput('Hlt2Topo.*')
-            self.fill('%s_hlt2_tos_topo' % pre, self.hlt2Tool.tisTosTobTrigger().tos())
-            self.fill('%s_hlt2_tis_topo' % pre, self.hlt2Tool.tisTosTobTrigger().tis())
 
         # Particle ID.
         self.fill('%s_pid' % pre, pid)
@@ -470,7 +471,7 @@ class Ntuple:
                     if i.isVelo():
                         # ?? What does detTool do? sensor()?
                         d = self.detTool.sensor(i.veloID())
-                        ids += [(d.z(), d, i)]
+                        ids += [(d.z(), i.lhcbID(), d, i)]
                     ids.sort()
             # Up to 4 VELO hits allowed per track. If less found, fill with -1
             for hit in range(0, 4):
@@ -484,7 +485,7 @@ class Ntuple:
                     continue
                 # ?? ADDITIONAL EXPLANATION NEEDED ??
                 # Calculate track parameters based on z position
-                z, d, i = ids[hit]
+                z, _, d, i = ids[hit]
                 s = i.veloID()
                 v = GaudiPython.gbl.LHCb.StateVector()
                 self.trkTool.propagate(trk, z, v, prt.particleID())
