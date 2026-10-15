@@ -31,12 +31,13 @@ import os
 
 # =============================================================================
 
-def parseArgs() -> bool:
+def parseArgs() -> tuple:
     """
     Parser method required for GaudiPython to work with AnalysisProductions.
 
-    Argument parser method required for GaudiPython to work with
-    AnalysisProductions because the option files get unsorted.
+    Loads the options files AnalysisProductions passes on the command line (the
+    job options file, the autoconf file and the prodConf file) and returns the
+    IS_MC and DECAY flags set by the job options file.
     """
 
     parser = argparse.ArgumentParser(
@@ -52,7 +53,7 @@ def parseArgs() -> bool:
     args = parser.parse_args()
 
     # Options file loading logic
-    opt = None
+    flags = {}
     for options_path in args.options_paths:
         print("Adding options file:", options_path)
         loader = importlib.machinery.SourceFileLoader(
@@ -60,20 +61,14 @@ def parseArgs() -> bool:
         spec = importlib.util.spec_from_loader(loader.name, loader)
         mod = importlib.util.module_from_spec(spec)
         loader.exec_module(mod)
-        try: opt = mod.backwards
-        except AttributeError: pass
+        for name in ('IS_MC', 'DECAY'):
+            if hasattr(mod, name): flags[name] = getattr(mod, name)
 
-    if opt is None:
-        opt = 'False'
-        print("Warning: No options file set BDTTagger.Backwards." +
-              "Defaulting to 'False'.")
-    else: print(f"Running with BDTTagger.Backwards == '{opt}'.")
+    if 'IS_MC' not in flags or 'DECAY' not in flags:
+        raise ValueError("The job options file must set IS_MC and DECAY.")
+    print(f"Running with IS_MC = {flags['IS_MC']}, DECAY = '{flags['DECAY']}'.")
 
-    if opt == 'True': backwards = True
-    elif opt == 'False': backwards = False
-    else: raise ValueError("Invalid input, must be 'True' or 'False'")
-
-    return backwards
+    return flags['IS_MC'], flags['DECAY']
 
 # =============================================================================
 
@@ -91,7 +86,8 @@ def parseArgsLocal():
 # Possible decay options
 DECAYS = ['eta2mumu', 'eta2mumugamma', 'eta2mumumumu', 'eta2mumuee']
 
-# Set flags
+# Set flags (local samples; AnalysisProductions jobs set IS_MC and DECAY in their
+# job options file)
 # True = MC | False = Turbo Run 2 data
 IS_MC = False
 # True = signal | False = minbias
@@ -101,8 +97,6 @@ IS_SIGNAL = False
 IS_SAMPLE = False
 # Decay type
 DECAY = 'eta2mumu'
-if DECAY not in DECAYS: 
-    raise ValueError(f"Invalid decay mode. Must be one of {DECAYS}.")
 
 DaVinci().DataType = '2018'
 DaVinci().Lumi = False  # Processing luminosity data
@@ -152,9 +146,11 @@ if IS_SAMPLE:
     extension = "_" + str(datetime.now().strftime("%Y%m%d")) + ".root"
 # Analysis production
 else:
-    backwards = parseArgs()
+    IS_MC, DECAY = parseArgs()
     # Output file
     outfile = f"{ProdConf().OutputFilePrefix}.{ProdConf().OutputFileTypes[0]}"
+if DECAY not in DECAYS:
+    raise ValueError(f"Invalid decay mode. Must be one of {DECAYS}.")
     
 # Reconstruction.
 from Configurables import CombineParticles
