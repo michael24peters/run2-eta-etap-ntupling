@@ -16,9 +16,9 @@ In `ana.py` you will see near the top the following flags:
 - `IS_SIGNAL`: True = signal, False = minbias
 - `IS_SAMPLE`: True = local sample (for testing), False = analysis production
 - `DECAY`: string of decay type. Current options:
-    - `'eta2mumu'`
-    - `'eta2mumugamma'`
-    - `'eta2mumumumu'`
-    - `'eta2mumuee'`
+  - `'eta2mumu'`
+  - `'eta2mumugamma'`
+  - `'eta2mumumumu'`
+  - `'eta2mumuee'`
 
 Change these flags as appropriate.
